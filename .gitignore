@@ -1,3 +1,6 @@
+# Claude Code 프로젝트 메모리
+.claude/
+
 # 임시 lint 결과 파일
 _lint_result.json
 
