@@ -1,0 +1,19 @@
+# 임시 lint 결과 파일
+_lint_result.json
+
+# Python 캐시
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 운영체제 파일
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 에디터 설정
+.vscode/
+.idea/
+
+# Obsidian 설정 (vault 설정은 공유 안 함)
+.obsidian/
