@@ -9,6 +9,7 @@ without modifying the project's current source folders.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import date
 from pathlib import Path
@@ -19,10 +20,9 @@ RAW_FOLDER_HINTS = ("raw", "inbox", "reference", "references", "sources")
 
 def find_raw_folders(base: Path) -> list[Path]:
     """Find plausible raw-source folders at the project root."""
-    found: list[Path] = []
+    found = []
     if not base.is_dir():
         return found
-
     for item in sorted(base.iterdir()):
         if not item.is_dir():
             continue
@@ -37,55 +37,40 @@ def escape_yaml(value: str) -> str:
 
 
 def create_index_content(title: str, today: str) -> str:
-    safe_title = escape_yaml(title)
-    return f"""---
-title: "{safe_title} Index"
-last_updated: {today}
----
-
-# {title}
-
-This file is the catalog for the wiki. Keep one-line summaries for each page.
-
-## Sources
-- _(none yet)_
-
-## Entities
-- _(none yet)_
-
-## Topics
-- _(none yet)_
-
-## Analysis
-- _(none yet)_
-"""
+    safe = escape_yaml(title)
+    return (
+        '---\ntitle: "%s Index"\nlast_updated: %s\n---\n\n'
+        '# %s\n\n'
+        'This file is the catalog for the wiki. Keep one-line summaries for each page.\n\n'
+        '## Sources\n- _(none yet)_\n\n'
+        '## Entities\n- _(none yet)_\n\n'
+        '## Topics\n- _(none yet)_\n\n'
+        '## Analysis\n- _(none yet)_\n'
+    ) % (safe, today, title)
 
 
 def create_log_content(title: str, today: str) -> str:
-    safe_title = escape_yaml(title)
-    return f"""---
-title: "{safe_title} Log"
----
-
-# Work Log
-
-## [{today}] init | Wiki bootstrap
-- Created wiki structure.
-- Created `wiki/index.md` and `wiki/log.md`.
-- Next step: create `CLAUDE.md` from `schema-template.md`.
-"""
+    safe = escape_yaml(title)
+    return (
+        '---\ntitle: "%s Log"\n---\n\n'
+        '# Work Log\n\n'
+        '## [%s] init | Wiki bootstrap\n'
+        '- Created wiki structure.\n'
+        '- Created `wiki/index.md` and `wiki/log.md`.\n'
+        '- Next step: create `CLAUDE.md` from `schema-template.md`.\n'
+    ) % (safe, today)
 
 
 def create_wiki_structure(target: str, title: str = "LLM Wiki") -> int:
     base = Path(target).expanduser().resolve()
     if not base.exists() or not base.is_dir():
-        print(f"Error: target folder does not exist: {target}")
+        print("Error: target folder does not exist: %s" % target)
         return 1
 
     wiki = base / "wiki"
     today = date.today().isoformat()
 
-    created_items: list[str] = []
+    created_items = []
     for directory in (
         wiki / "sources",
         wiki / "entities",
@@ -106,11 +91,35 @@ def create_wiki_structure(target: str, title: str = "LLM Wiki") -> int:
         log_path.write_text(create_log_content(title, today), encoding="utf-8")
         created_items.append(str(log_path.relative_to(base)))
 
+    # Operational JSON files for LINT/QUERY token optimization
+    summary_index_path = wiki / "_summary-index.json"
+    if not summary_index_path.exists():
+        summary_index_path.write_text(
+            json.dumps({"pages": [], "last_updated": today}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        created_items.append(str(summary_index_path.relative_to(base)))
+
+    last_lint_path = wiki / "_last-lint.json"
+    if not last_lint_path.exists():
+        last_lint_path.write_text(
+            json.dumps({"last_lint": None, "scope": []}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        created_items.append(str(last_lint_path.relative_to(base)))
+
+    lint_cache_path = wiki / "_lint-cache.json"
+    if not lint_cache_path.exists():
+        lint_cache_path.write_text(
+            json.dumps({"checked_pairs": [], "last_updated": today}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        created_items.append(str(lint_cache_path.relative_to(base)))
+
     raw_candidates = find_raw_folders(base)
-    raw_note: str
     if raw_candidates:
         raw_note = "Using existing raw-source folders: " + ", ".join(
-            str(path.relative_to(base)) for path in raw_candidates
+            str(p.relative_to(base)) for p in raw_candidates
         )
     else:
         raw_dir = base / "raw"
@@ -120,17 +129,15 @@ def create_wiki_structure(target: str, title: str = "LLM Wiki") -> int:
         raw_note = "Created `raw/` for immutable source documents."
 
     print("=== LLM Wiki initialized ===")
-    print(f"Target: {base}")
-    print(f"Title: {title}")
+    print("Target: %s" % base)
+    print("Title: %s" % title)
     print()
-
     if created_items:
         print("Created:")
         for item in created_items:
-            print(f"  + {item}")
+            print("  + %s" % item)
     else:
         print("No files were created. Existing structure was kept as-is.")
-
     print()
     print(raw_note)
     print()
